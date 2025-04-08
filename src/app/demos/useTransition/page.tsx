@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, ChangeEvent, FormEvent } from 'react';
+import { useState, useTransition, ChangeEvent, useEffect } from 'react';
 
 // Sample data array - using a larger dataset to demonstrate performance benefits
 const generateItems = () => {
@@ -19,6 +19,9 @@ export default function UseTransitionDemo() {
   // State for the filter input
   const [filterText, setFilterText] = useState('');
   
+  // State to track the current sort type
+  const [currentSort, setCurrentSort] = useState<string | null>(null);
+  
   // Using useTransition for the filtering operation
   const [isPending, startTransition] = useTransition();
   
@@ -34,14 +37,7 @@ export default function UseTransitionDemo() {
       if (text.trim() === '') {
         setFilteredItems(items);
       } else {
-        // Intentionally use a slow filtering algorithm to demonstrate the benefit
         const filtered = items.filter(item => {
-          // Artificial delay to simulate an expensive computation
-          const start = performance.now();
-          while (performance.now() - start < 0.1) {
-            // Busy wait to simulate CPU-intensive work
-          }
-          
           return item.name.toLowerCase().includes(text.toLowerCase()) ||
                  item.category.toLowerCase().includes(text.toLowerCase());
         });
@@ -53,12 +49,22 @@ export default function UseTransitionDemo() {
   
   // Sorting functionality
   function handleSort(sortBy: 'id' | 'name' | 'category') {
+    // Update current sort type for UI feedback
+    setCurrentSort(sortBy);
+    
+    // Use startTransition to make this non-urgent
     startTransition(() => {
-      setFilteredItems(prev => [...prev].sort((a, b) => {
+      // Sort the items
+      const sorted = [...filteredItems].sort((a, b) => {
         if (sortBy === 'id') return a.id - b.id;
         if (sortBy === 'name') return a.name.localeCompare(b.name);
         return a.category.localeCompare(b.category);
-      }));
+      });
+      
+      // Set the sorted items with a timeout to simulate server delay
+      setTimeout(() => {
+        setFilteredItems(sorted);
+      }, 1000);
     });
   }
   
@@ -82,43 +88,46 @@ export default function UseTransitionDemo() {
               placeholder="Filter items..."
               className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
             />
-            {isPending && (
+            {isPending && filterText && (
               <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500"></div>
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500">isPending</div>
               </div>
             )}
           </div>
           
           <div className="flex gap-2">
-            <button 
-              onClick={() => handleSort('id')}
-              className="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-gray-800 text-sm font-medium"
-            >
-              Sort by ID
-            </button>
-            <button 
-              onClick={() => handleSort('name')}
-              className="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-gray-800 text-sm font-medium"
-            >
-              Sort by Name
-            </button>
-            <button 
-              onClick={() => handleSort('category')}
-              className="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-gray-800 text-sm font-medium"
-            >
-              Sort by Category
-            </button>
+            {['id', 'name', 'category'].map((sortType) => (
+              <button 
+                key={sortType}
+                onClick={() => handleSort(sortType as 'id' | 'name' | 'category')}
+                disabled={isPending && currentSort === sortType}
+                className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center ${
+                  isPending && currentSort === sortType
+                    ? 'bg-blue-100 text-blue-700 cursor-not-allowed' 
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                }`}
+              >
+                {isPending && currentSort === sortType ? (
+                  <span className="animate-spin h-3 w-3 border-t-2 border-b-2 border-blue-500 rounded-full mr-2">isPending</span>
+                ) : (
+                  <span>Sort by {sortType.charAt(0).toUpperCase() + sortType.slice(1)}</span>
+                )}
+              </button>
+            ))}
           </div>
         </div>
         
         {isPending && (
           <div className="mb-4 p-3 bg-blue-50 text-blue-800 rounded-lg text-sm">
-            Processing your request... The UI remains responsive while this happens!
+            {currentSort ? 
+              `Sorting by ${currentSort}...` : 
+              `Filtering for "${filterText}"...`} 
+            The UI remains responsive while this happens!
           </div>
         )}
         
         <div className="text-sm text-gray-600 mb-2">
-          {isPending ? 'Calculating...' : `Showing ${filteredItems.length} of ${items.length} items`}
+          {isPending ? 'Processing...' : `Showing ${filteredItems.length} of ${items.length} items`}
         </div>
       </div>
       
